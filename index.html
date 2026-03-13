@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokédex Completa - Tipos e Fraquezas</title>
+    <style>
+        /* CSS INTEGRADO */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        h1 { color: #333; margin-bottom: 20px; }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus { border-color: #ff1c1c; }
+
+        button {
+            padding: 10px 20px;
+            background-color: #ff1c1c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        button:hover { background-color: #d11515; }
+
+        .pokemon-card {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pokemon-card img {
+            width: 180px;
+            height: 180px;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1));
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            margin: 4px;
+            border-radius: 20px;
+            color: white;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* Cores dos Tipos Pokémon */
+        .fire { background: #F08030; }
+        .water { background: #6890F0; }
+        .grass { background: #78C850; }
+        .electric { background: #F8D030; color: #333; }
+        .ice { background: #98D8D8; color: #333; }
+        .fighting { background: #C03028; }
+        .poison { background: #A040A0; }
+        .ground { background: #E0C068; }
+        .flying { background: #A890F0; }
+        .psychic { background: #F85888; }
+        .bug { background: #A8B820; }
+        .rock { background: #B8A038; }
+        .ghost { background: #705898; }
+        .dragon { background: #7038F8; }
+        .dark { background: #705848; }
+        .steel { background: #B8B8D0; color: #333; }
+        .fairy { background: #EE99AC; }
+        .normal { background: #A8A878; }
+
+        .info-section {
+            text-align: left;
+            margin-top: 25px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 12px;
+        }
+
+        .info-section h3 {
+            font-size: 1rem;
+            color: #555;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        .badge-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Pokédex Pro</h1>
+        <div class="search-box">
+            <input type="text" id="pokemonInput" placeholder="Ex: Charizard ou 6" onkeydown="if(event.key==='Enter') searchPokemon()">
+            <button onclick="searchPokemon()">Buscar</button>
+        </div>
+
+        <div id="pokedexContent">
+            <p>Digite o nome de um Pokémon para analisar suas fraquezas.</p>
+        </div>
+    </div>
+
+    <script>
+        /* JAVASCRIPT INTEGRADO */
+        async function searchPokemon() {
+            const inputField = document.getElementById('pokemonInput');
+            const nameOrId = inputField.value.toLowerCase().trim();
+            const content = document.getElementById('pokedexContent');
+            
+            if (!nameOrId) return;
+
+            try {
+                content.innerHTML = "<p>Buscando dados na PokeAPI...</p>";
+
+                // 1. Busca os dados do Pokémon
+                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${nameOrId}`);
+                if (!res.ok) throw new Error("Pokémon não encontrado!");
+                const pokemon = await res.json();
+
+                // 2. Busca as relações de dano de cada tipo do Pokémon
+                const damagePromises = pokemon.types.map(t => fetch(t.type.url).then(r => r.json()));
+                const typeDetails = await Promise.all(damagePromises);
+
+                // 3. Calcula fraquezas e resistências combinadas
+                const { weaknesses, resistances } = calculateStats(typeDetails);
+
+                // 4. Monta o HTML
+                const typesHtml = pokemon.types.map(t => 
+                    `<span class="type-badge ${t.type.name}">${t.type.name}</span>`
+                ).join('');
+
+                content.innerHTML = `
+                    <div class="pokemon-card">
+                        <h2 style="text-transform: capitalize;">#${pokemon.id} - ${pokemon.name}</h2>
+                        <img src="${pokemon.sprites.other['official-artwork'].front_default}" alt="${pokemon.name}">
+                        <div>${typesHtml}</div>
+                        
+                        <div class="info-section">
+                            <h3>Fraquezas (Recebe mais dano)</h3>
+                            <div class="badge-container">${renderBadges(weaknesses)}</div>
+                            
+                            <h3 style="margin-top:15px;">Resistências (Recebe menos dano)</h3>
+                            <div class="badge-container">${renderBadges(resistances)}</div>
+                        </div>
+                    </div>
+                `;
+
+            } catch (err) {
+                content.innerHTML = `<p style="color: #ff1c1c; font-weight: bold;">${err.message}</p>`;
+            }
+        }
+
+        function calculateStats(typeDataArray) {
+            let multipliers = {};
+
+            typeDataArray.forEach(typeObj => {
+                const rel = typeObj.damage_relations;
+
+                // Fraquezas
+                rel.double_damage_from.forEach(t => {
+                    multipliers[t.name] = (multipliers[t.name] || 1) * 2;
+                });
+                // Resistências
+                rel.half_damage_from.forEach(t => {
+                    multipliers[t.name] = (multipliers[t.name] || 1) * 0.5;
+                });
+                // Imunidades
+                rel.no_damage_from.forEach(t => {
+                    multipliers[t.name] = (multipliers[t.name] || 1) * 0;
+                });
+            });
+
+            const weaknesses = [];
+            const resistances = [];
+
+            for (const type in multipliers) {
+                if (multipliers[type] > 1) weaknesses.push(type);
+                if (multipliers[type] < 1) resistances.push(type);
+            }
+
+            return { weaknesses, resistances };
+        }
+
+        function renderBadges(list) {
+            if (list.length === 0) return "<small>Nenhum destaque</small>";
+            return list.map(name => `<span class="type-badge ${name}">${name}</span>`).join('');
+        }
+    </script>
+</body>
+</html>
